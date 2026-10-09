@@ -128,33 +128,56 @@ def create_policy_endpoint(req: CreatePolicyRequest):
     ver_id = f"ver_{uuid.uuid4().hex[:6]}"
     name = req.name or f"Policy for {req.ir.source.ref} -> {req.ir.destination.ref}"
 
-    compiled = compile_policy(req.ir, policy_version_id="v1")
     val_report = validate_intent(req.ir)
 
     with SessionLocal() as db:
-        policy = PolicyModel(
-            id=policy_id,
-            name=name,
-            status="draft",
-            active_version_id=ver_id,
-            created_at=datetime.utcnow()
-        )
-        version = PolicyVersionModel(
-            id=ver_id,
-            policy_id=policy_id,
-            version_num=1,
-            prompt=req.prompt,
-            ir_json=json.dumps(req.ir.model_dump()),
-            compiled_nft=compiled.nftables,
-            compiled_ipt=compiled.iptables,
-            compiled_cisco=compiled.cisco_acl,
-            risk_score=val_report.risk_score,
-            risk_level=val_report.risk_level,
-            created_at=datetime.utcnow()
-        )
-        db.add(policy)
-        db.add(version)
-        db.commit()
+        existing_p = db.query(PolicyModel).filter_by(id=policy_id).first()
+        if existing_p:
+            ver_num = len(existing_p.versions) + 1
+            compiled = compile_policy(req.ir, policy_version_id=f"v{ver_num}")
+            version = PolicyVersionModel(
+                id=ver_id,
+                policy_id=policy_id,
+                version_num=ver_num,
+                prompt=req.prompt,
+                ir_json=json.dumps(req.ir.model_dump()),
+                compiled_nft=compiled.nftables,
+                compiled_ipt=compiled.iptables,
+                compiled_cisco=compiled.cisco_acl,
+                risk_score=val_report.risk_score,
+                risk_level=val_report.risk_level,
+                created_at=datetime.now(timezone.utc)
+            )
+            existing_p.active_version_id = ver_id
+            existing_p.status = "draft"
+            existing_p.updated_at = datetime.now(timezone.utc)
+            db.add(version)
+            db.commit()
+        else:
+            compiled = compile_policy(req.ir, policy_version_id="v1")
+            policy = PolicyModel(
+                id=policy_id,
+                name=name,
+                status="draft",
+                active_version_id=ver_id,
+                created_at=datetime.now(timezone.utc)
+            )
+            version = PolicyVersionModel(
+                id=ver_id,
+                policy_id=policy_id,
+                version_num=1,
+                prompt=req.prompt,
+                ir_json=json.dumps(req.ir.model_dump()),
+                compiled_nft=compiled.nftables,
+                compiled_ipt=compiled.iptables,
+                compiled_cisco=compiled.cisco_acl,
+                risk_score=val_report.risk_score,
+                risk_level=val_report.risk_level,
+                created_at=datetime.now(timezone.utc)
+            )
+            db.add(policy)
+            db.add(version)
+            db.commit()
 
     log_audit_event(
         action="create_policy",

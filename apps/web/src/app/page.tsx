@@ -1,16 +1,21 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Header } from "@/components/Header";
+import { NavigationRail } from "@/components/NavigationRail";
+import { TopBar } from "@/components/TopBar";
+import { RightInspector } from "@/components/RightInspector";
+import { CommandPalette } from "@/components/CommandPalette";
+import { PipelineStepper } from "@/components/PipelineStepper";
 import { CommandCenter } from "@/components/CommandCenter";
 import { IntentReviewCard } from "@/components/IntentReviewCard";
-import { TopologyMap } from "@/components/TopologyMap";
+import { TopologyCanvas } from "@/components/TopologyCanvas";
 import { SimulationLab } from "@/components/SimulationLab";
 import { RuleDiffViewer } from "@/components/RuleDiffViewer";
 import { PolicyLibrary } from "@/components/PolicyLibrary";
 import { AuditTrail } from "@/components/AuditTrail";
 import { NetworkInventory } from "@/components/NetworkInventory";
 import { BenchmarkViewer } from "@/components/BenchmarkViewer";
+import { SettingsView } from "@/components/SettingsView";
 import {
   parseIntent,
   createPolicy,
@@ -25,12 +30,22 @@ import {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<string>("command");
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [inspectorEntity, setInspectorEntity] = useState<{
+    type: "node" | "probe" | "rule" | "policy";
+    data: any;
+  } | null>(null);
+
+  // Intentwall Pipeline State
+  const [pipelineStage, setPipelineStage] = useState<
+    "idle" | "understanding" | "validating" | "compiling" | "simulating" | "verified"
+  >("idle");
   const [promptHistory, setPromptHistory] = useState<string[]>([
     "Block YouTube for the guest network",
     "Isolate the guest Wi-Fi from internal servers",
   ]);
 
-  // Current Working State
   const [currentPrompt, setCurrentPrompt] = useState<string>("");
   const [parsedIR, setParsedIR] = useState<FirewallIntentIR | null>(null);
   const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
@@ -46,9 +61,31 @@ export default function Home() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
 
+  // Keyboard shortcut for Cmd+K and '/'
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Theme synchronization with html class
+  const handleToggleTheme = () => {
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
+
   // Initial load
   useEffect(() => {
-    // Initial parse to show demo state out-of-the-box
     handleParseIntent("Block YouTube for the guest network", "auto");
     refreshPolicyCount();
   }, []);
@@ -58,31 +95,35 @@ export default function Home() {
       const pols = await listPolicies();
       setActivePolicyCount(pols.filter((p: any) => p.status === "applied").length);
     } catch {
-      // offline / not ready yet
+      // offline / initial
     }
   };
 
   const handleParseIntent = async (prompt: string, provider: string) => {
     setIsParsing(true);
     setCurrentPrompt(prompt);
+    setPipelineStage("understanding");
     try {
       const res = await parseIntent(prompt, provider);
       setParsedIR(res.ir);
       setValidationReport(res.validation);
       setProviderUsed(res.provider_used);
 
-      // Create policy draft in backend
+      setPipelineStage("validating");
       const polRes = await createPolicy(prompt, res.ir);
       setCurrentPolicyId(polRes.policy_id);
       setCompiledRules(polRes.compiled);
       setPolicyStatus("draft");
       setSimulationProbes([]);
 
+      setPipelineStage("compiling");
+
       if (!promptHistory.includes(prompt)) {
         setPromptHistory((prev) => [prompt, ...prev]);
       }
     } catch (err: any) {
       alert("Error parsing intent: " + err.message);
+      setPipelineStage("idle");
     } finally {
       setIsParsing(false);
     }
@@ -91,13 +132,18 @@ export default function Home() {
   const handleSimulatePolicy = async () => {
     if (!currentPolicyId) return;
     setIsSimulating(true);
+    setPipelineStage("simulating");
     setActiveTab("simulation");
     try {
       const res = await simulatePolicy(currentPolicyId);
       setSimulationProbes(res.results);
       setPolicyStatus("simulated");
+      if (res.all_passed) {
+        setPipelineStage("verified");
+      }
     } catch (err: any) {
       alert("Simulation error: " + err.message);
+      setPipelineStage("compiling");
     } finally {
       setIsSimulating(false);
     }
@@ -110,7 +156,7 @@ export default function Home() {
       await approvePolicy(currentPolicyId, "security-reviewer");
       setPolicyStatus("applied");
       refreshPolicyCount();
-      alert("Policy Approved & Applied to Gateway Firewall! nftables counters active.");
+      alert("Policy Approved & Applied to Gateway Firewall. nftables stateful counters active.");
     } catch (err: any) {
       alert("Approval error: " + err.message);
     } finally {
@@ -136,99 +182,152 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#080c14] text-slate-100 selection:bg-indigo-500/30">
-      <Header
+    <div className="min-h-screen flex bg-[var(--bg)] text-[var(--ink-700)] selection:bg-[var(--pal-300)]">
+      {/* 1. Left Rail (72px collapsed) */}
+      <NavigationRail
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        activePolicyCount={activePolicyCount}
+        policyCount={activePolicyCount}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* TAB 1: COMMAND CENTER */}
-        {activeTab === "command" && (
-          <div className="space-y-6">
-            <CommandCenter
-              onParseIntent={handleParseIntent}
-              isParsing={isParsing}
-              history={promptHistory}
-            />
+      {/* 2. Main Content Area (Offset for Rail) */}
+      <div className="flex-1 flex flex-col pl-[72px] min-h-screen">
+        {/* Sticky Top Bar (Glass-Thin) */}
+        <TopBar
+          activeTab={activeTab}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          isDarkMode={isDarkMode}
+          onToggleTheme={handleToggleTheme}
+          policyId={currentPolicyId}
+        />
 
-            {parsedIR && validationReport && (
-              <IntentReviewCard
-                ir={parsedIR}
-                validation={validationReport}
-                providerUsed={providerUsed}
-                onSimulate={handleSimulatePolicy}
-                isSimulating={isSimulating}
+        {/* Main Body Grid */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-6 pb-12 space-y-6">
+          {/* Pipeline Stepper (Visible during or after compilation) */}
+          {pipelineStage !== "idle" && (
+            <PipelineStepper currentStage={pipelineStage} />
+          )}
+
+          {/* TAB 1: COMMAND CENTER */}
+          {activeTab === "command" && (
+            <div className="space-y-6">
+              <CommandCenter
+                onParseIntent={handleParseIntent}
+                isParsing={isParsing}
+                history={promptHistory}
               />
-            )}
 
-            <TopologyMap
-              blockedTarget={parsedIR?.destination.ref}
-              isSimulating={isSimulating}
-              lastSimResult={
-                simulationProbes.length > 0
-                  ? {
-                      passed: simulationProbes.every((p) => p.passed),
-                      all_passed: simulationProbes.every((p) => p.passed),
-                    }
-                  : undefined
+              {parsedIR && validationReport && (
+                <IntentReviewCard
+                  ir={parsedIR}
+                  validation={validationReport}
+                  providerUsed={providerUsed}
+                  onSimulate={handleSimulatePolicy}
+                  isSimulating={isSimulating}
+                />
+              )}
+
+              <TopologyCanvas
+                blockedTarget={parsedIR?.destination.ref}
+                isSimulating={isSimulating}
+                lastSimResult={
+                  simulationProbes.length > 0
+                    ? {
+                        passed: simulationProbes.every((p) => p.passed),
+                        all_passed: simulationProbes.every((p) => p.passed),
+                      }
+                    : undefined
+                }
+                onSelectNode={(node) => setInspectorEntity({ type: "node", data: node })}
+              />
+            </div>
+          )}
+
+          {/* TAB 2: SIMULATION LAB */}
+          {activeTab === "simulation" && (
+            <div className="space-y-6">
+              <TopologyCanvas
+                blockedTarget={parsedIR?.destination.ref}
+                isSimulating={isSimulating}
+                lastSimResult={
+                  simulationProbes.length > 0
+                    ? {
+                        passed: simulationProbes.every((p) => p.passed),
+                        all_passed: simulationProbes.every((p) => p.passed),
+                      }
+                    : undefined
+                }
+                onSelectNode={(node) => setInspectorEntity({ type: "node", data: node })}
+              />
+
+              <SimulationLab
+                probes={simulationProbes}
+                isSimulating={isSimulating}
+                onApprove={handleApprovePolicy}
+                isApproving={isApproving}
+                appliedStatus={policyStatus}
+                onViewDiff={() => setActiveTab("diff")}
+                onSelectProbeForInspector={(probe) =>
+                  setInspectorEntity({ type: "probe", data: probe })
+                }
+              />
+            </div>
+          )}
+
+          {/* TAB 3: RULE DIFF VIEWER */}
+          {activeTab === "diff" && (
+            <RuleDiffViewer compiled={compiledRules} policyId={currentPolicyId || undefined} />
+          )}
+
+          {/* TAB 4: POLICY LIBRARY */}
+          {activeTab === "policies" && (
+            <PolicyLibrary onSelectPolicy={handleSelectPolicyFromLibrary} />
+          )}
+
+          {/* TAB 5: AUDIT TRAIL */}
+          {activeTab === "audit" && (
+            <AuditTrail
+              onSelectEventForInspector={(ev) =>
+                setInspectorEntity({ type: "policy", data: ev })
               }
             />
-          </div>
-        )}
+          )}
 
-        {/* TAB 2: SIMULATION LAB */}
-        {activeTab === "simulation" && (
-          <div className="space-y-6">
-            <TopologyMap
-              blockedTarget={parsedIR?.destination.ref}
-              isSimulating={isSimulating}
-              lastSimResult={
-                simulationProbes.length > 0
-                  ? {
-                      passed: simulationProbes.every((p) => p.passed),
-                      all_passed: simulationProbes.every((p) => p.passed),
-                    }
-                  : undefined
-              }
+          {/* TAB 6: NETWORK & SERVICES */}
+          {activeTab === "inventory" && <NetworkInventory />}
+
+          {/* TAB 7: BENCHMARK 100 */}
+          {activeTab === "benchmark" && <BenchmarkViewer />}
+
+          {/* TAB 8: SETTINGS */}
+          {activeTab === "settings" && (
+            <SettingsView
+              isDarkMode={isDarkMode}
+              onToggleTheme={handleToggleTheme}
             />
+          )}
+        </main>
 
-            <SimulationLab
-              probes={simulationProbes}
-              isSimulating={isSimulating}
-              onApprove={handleApprovePolicy}
-              isApproving={isApproving}
-              appliedStatus={policyStatus}
-              onViewDiff={() => setActiveTab("diff")}
-            />
-          </div>
-        )}
+        {/* Footer */}
+        <footer className="border-t border-[var(--pal-200)] py-3 px-6 text-center text-xs text-[var(--ink-500)] font-mono">
+          Intentwall • Soft Graphite UI • Ground is Neumorphic, Air is Glass • Free Tier & Open Source
+        </footer>
+      </div>
 
-        {/* TAB 3: RULE DIFF VIEWER */}
-        {activeTab === "diff" && (
-          <RuleDiffViewer compiled={compiledRules} policyId={currentPolicyId || undefined} />
-        )}
+      {/* 3. Floating Right Inspector (Glass) */}
+      <RightInspector
+        isOpen={Boolean(inspectorEntity)}
+        onClose={() => setInspectorEntity(null)}
+        selectedEntity={inspectorEntity}
+      />
 
-        {/* TAB 4: POLICIES LIBRARY */}
-        {activeTab === "policies" && (
-          <PolicyLibrary onSelectPolicy={handleSelectPolicyFromLibrary} />
-        )}
-
-        {/* TAB 5: AUDIT TRAIL */}
-        {activeTab === "audit" && <AuditTrail />}
-
-        {/* TAB 6: NETWORK & SERVICES */}
-        {activeTab === "inventory" && <NetworkInventory />}
-
-        {/* TAB 7: BENCHMARK 100 */}
-        {activeTab === "benchmark" && <BenchmarkViewer />}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-4 text-center text-xs text-slate-500 font-mono">
-        Intentwall v1.0 • Verifiable Natural-Language Firewall Engine • Free Tier & Open Source
-      </footer>
+      {/* 4. Command Palette Dialog (Cmd+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        onSelectPrompt={(pr) => handleParseIntent(pr, "auto")}
+      />
     </div>
   );
 }

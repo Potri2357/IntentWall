@@ -2,9 +2,23 @@
 
 import React, { useState, useEffect } from "react";
 import { getAuditTrail } from "@/lib/api";
-import { FileText, Shield, Clock, User, CheckCircle, RotateCcw, AlertTriangle } from "lucide-react";
+import {
+  ScrollText,
+  Sparkles,
+  FlaskConical,
+  ShieldCheck,
+  RotateCcw,
+  Clock,
+  User,
+  CheckCircle,
+  FileCode,
+} from "lucide-react";
 
-export function AuditTrail() {
+interface AuditTrailProps {
+  onSelectEventForInspector?: (event: any) => void;
+}
+
+export function AuditTrail({ onSelectEventForInspector }: AuditTrailProps) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,84 +37,116 @@ export function AuditTrail() {
     fetchAudit();
   }, []);
 
+  const getEventIcon = (action: string) => {
+    switch (action) {
+      case "parse_intent":
+        return Sparkles;
+      case "simulate_policy":
+        return FlaskConical;
+      case "approve_and_apply":
+        return ShieldCheck;
+      case "rollback_policy":
+        return RotateCcw;
+      default:
+        return FileCode;
+    }
+  };
+
   return (
-    <div className="glass-panel-elevated rounded-2xl p-6 border border-slate-800 space-y-4">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="neu-raised-md p-6 border border-[var(--pal-200)] space-y-4">
+      <div className="flex items-center justify-between pb-4 border-b border-[var(--pal-200)]">
         <div>
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-indigo-400" />
-            Append-Only Audit Log
+          <h3 className="text-sm font-bold text-[var(--ink-900)] flex items-center gap-2">
+            <ScrollText className="w-4 h-4 text-[var(--ink-700)]" strokeWidth={1.75} />
+            Append-Only Audit Timeline
           </h3>
-          <p className="text-xs text-slate-400">
-            Immutable log of natural-language requests, model outputs, probe verification results, and approvals.
+          <p className="text-xs text-[var(--ink-500)] mt-0.5">
+            Cryptographically auditable timeline of prompts, models, simulation evidence, and administrative changes.
           </p>
         </div>
         <button
           onClick={fetchAudit}
-          className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs border border-slate-700 cursor-pointer"
+          className="neu-raised-sm px-3 py-1.5 rounded-xl text-xs text-[var(--ink-700)] hover:text-[var(--ink-900)] cursor-pointer"
         >
-          Refresh Log
+          Refresh Timeline
         </button>
       </div>
 
       {loading ? (
-        <div className="p-8 text-center text-slate-500 text-xs">Loading audit trail...</div>
+        <div className="p-8 text-center text-[var(--ink-500)] text-xs font-mono">
+          Loading audit entries...
+        </div>
       ) : events.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 text-xs font-mono">
+        <div className="p-8 text-center text-[var(--ink-500)] text-xs font-mono">
           No audit entries recorded yet.
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-[2px] before:bg-[var(--pal-200)]">
           {events.map((ev) => {
+            const Icon = getEventIcon(ev.action);
             const isApply = ev.action === "approve_and_apply";
             const isRollback = ev.action === "rollback_policy";
-            const isSimulate = ev.action === "simulate_policy";
 
             return (
               <div
                 key={ev.id}
-                className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs font-mono flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                onClick={() => onSelectEventForInspector && onSelectEventForInspector(ev)}
+                className="relative neu-raised-sm p-4 border border-[var(--pal-200)] rounded-xl transition-all hover:neu-inset cursor-pointer"
               >
-                <div className="space-y-1">
+                {/* Node icon dot on timeline line */}
+                <div
+                  className={`absolute -left-[30px] top-4 w-6 h-6 rounded-full flex items-center justify-center border ${
+                    isApply
+                      ? "bg-[rgba(26,107,67,0.12)] text-[var(--allow)] border-[var(--allow)]"
+                      : isRollback
+                      ? "bg-[rgba(179,38,30,0.12)] text-[var(--deny)] border-[var(--deny)]"
+                      : "neu-raised-sm text-[var(--ink-700)] border-[var(--pal-200)] bg-[var(--surface-card)]"
+                  }`}
+                >
+                  <Icon className="w-3 h-3" strokeWidth={1.75} />
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
                         isApply
-                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                          ? "bg-[rgba(26,107,67,0.12)] text-[var(--allow)]"
                           : isRollback
-                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
-                          : isSimulate
-                          ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
-                          : "bg-slate-800 text-slate-300"
+                          ? "bg-[rgba(179,38,30,0.12)] text-[var(--deny)]"
+                          : "neu-inset text-[var(--ink-700)]"
                       }`}
                     >
                       {ev.action}
                     </span>
-                    <span className="text-slate-200 font-semibold">{ev.object_ref}</span>
+                    <span className="font-mono text-xs font-semibold text-[var(--ink-900)]">
+                      {ev.object_ref}
+                    </span>
                   </div>
 
-                  <div className="text-slate-400 text-[11px] font-sans">
-                    {ev.payload.prompt && (
-                      <span className="italic">"{ev.payload.prompt}" </span>
-                    )}
-                    {ev.payload.passed !== undefined && (
-                      <span className="text-emerald-400 font-mono">
-                        (Passed: {ev.payload.passed}/{ev.payload.total} probes)
-                      </span>
-                    )}
+                  <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--ink-500)]">
+                    <span className="flex items-center gap-1 text-[var(--ink-700)]">
+                      <User className="w-3 h-3 text-[var(--ink-500)]" strokeWidth={1.75} />
+                      {ev.actor}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-[var(--ink-500)]" strokeWidth={1.75} />
+                      {new Date(ev.created_at).toLocaleTimeString()}
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-[11px] text-slate-400 shrink-0">
-                  <span className="flex items-center gap-1 text-slate-300">
-                    <User className="w-3 h-3 text-slate-500" />
-                    {ev.actor}
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-slate-500" />
-                    {new Date(ev.created_at).toLocaleTimeString()}
-                  </span>
+                {/* Event payload details */}
+                <div className="mt-2 text-xs text-[var(--ink-600)] font-sans">
+                  {ev.payload.prompt && (
+                    <span className="italic">"{ev.payload.prompt}" </span>
+                  )}
+                  {ev.payload.passed !== undefined && (
+                    <span className="text-[var(--allow)] font-mono block mt-1">
+                      Evidence proven: {ev.payload.passed}/{ev.payload.total} probes passed
+                    </span>
+                  )}
                 </div>
               </div>
             );

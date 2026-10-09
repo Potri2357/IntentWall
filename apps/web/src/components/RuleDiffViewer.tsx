@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { CompiledRuleset } from "@/lib/api";
-import { Copy, Download, Check, ShieldCheck, Terminal, Layers } from "lucide-react";
+import { Copy, Download, Check, ShieldCheck, Layers, FileDiff } from "lucide-react";
 
 interface RuleDiffViewerProps {
   compiled: CompiledRuleset | null;
@@ -15,9 +15,9 @@ export function RuleDiffViewer({ compiled, policyId }: RuleDiffViewerProps) {
 
   if (!compiled) {
     return (
-      <div className="glass-panel-elevated rounded-2xl p-12 text-center text-slate-400">
-        <Layers className="w-8 h-8 text-slate-500 mx-auto mb-3" />
-        <p className="text-sm">No rules compiled yet. Create or select a policy to inspect generated syntax.</p>
+      <div className="neu-raised-md p-12 text-center text-[var(--ink-500)] border border-[var(--pal-200)]">
+        <Layers className="w-8 h-8 text-[var(--ink-400)] mx-auto mb-3" strokeWidth={1.75} />
+        <p className="text-sm">No rules compiled yet. Compile an intent to inspect generated firewall syntax.</p>
       </div>
     );
   }
@@ -53,28 +53,31 @@ export function RuleDiffViewer({ compiled, policyId }: RuleDiffViewerProps) {
   const lines = getContent().split("\n");
 
   return (
-    <div className="glass-panel-elevated rounded-2xl p-6 border border-slate-800 space-y-4">
-      {/* Header with Format Selector */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+    <div className="neu-raised-md p-6 border border-[var(--pal-200)] space-y-4">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-[var(--pal-200)] gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-slate-100">Deterministic Multi-Target Rule Compiler</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 font-mono">
+            <FileDiff className="w-4 h-4 text-[var(--ink-700)]" strokeWidth={1.75} />
+            <h3 className="text-sm font-bold text-[var(--ink-900)]">
+              Multi-Target Rule Compiler & Diff
+            </h3>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(26,107,67,0.12)] text-[var(--allow)] border border-[rgba(26,107,67,0.3)] flex items-center gap-1 font-mono">
               <ShieldCheck className="w-3 h-3" />
-              nft -c syntax valid
+              nft -c dry-run valid
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">{compiled.summary}</p>
+          <p className="text-xs text-[var(--ink-500)] mt-0.5 font-sans">{compiled.summary}</p>
         </div>
 
-        {/* Format Selector Pills */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
+        {/* Tab Switcher Pills */}
+        <div className="flex items-center gap-1 p-1 rounded-xl neu-inset">
           <button
             onClick={() => setActiveTab("nftables")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "nftables"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-slate-200"
+                ? "btn-graphite-primary"
+                : "text-[var(--ink-600)] hover:text-[var(--ink-900)]"
             }`}
           >
             Linux nftables (Primary)
@@ -83,8 +86,8 @@ export function RuleDiffViewer({ compiled, policyId }: RuleDiffViewerProps) {
             onClick={() => setActiveTab("iptables")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "iptables"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-slate-200"
+                ? "btn-graphite-primary"
+                : "text-[var(--ink-600)] hover:text-[var(--ink-900)]"
             }`}
           >
             iptables (Legacy)
@@ -93,39 +96,40 @@ export function RuleDiffViewer({ compiled, policyId }: RuleDiffViewerProps) {
             onClick={() => setActiveTab("cisco")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "cisco"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-slate-200"
+                ? "btn-graphite-primary"
+                : "text-[var(--ink-600)] hover:text-[var(--ink-900)]"
             }`}
           >
-            Cisco IOS-XE ACL
+            Cisco Extended ACL
           </button>
         </div>
       </div>
 
-      {/* Code Viewer Panel */}
-      <div className="rounded-xl bg-black/90 border border-slate-800 overflow-hidden font-mono text-xs shadow-2xl relative">
-        {/* Top actions toolbar */}
-        <div className="flex items-center justify-between px-4 py-2 bg-slate-950 border-b border-slate-800/80 text-[11px] text-slate-400">
+      {/* Code Well (Inset Well) */}
+      <div className="rounded-xl neu-inset p-4 overflow-hidden font-mono text-xs shadow-inner relative">
+        {/* Actions Floating Toolbar (Glass-Thin) */}
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-[var(--pal-200)] text-[11px] text-[var(--ink-500)]">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-            <span className="ml-2 font-mono text-slate-300">
-              {activeTab === "nftables" ? "/etc/nftables.conf" : activeTab === "iptables" ? "/etc/iptables/rules.v4" : "cisco_acl.cfg"}
+            <span className="font-mono text-[var(--ink-700)]">
+              {activeTab === "nftables"
+                ? "/etc/nftables.conf"
+                : activeTab === "iptables"
+                ? "/etc/iptables/rules.v4"
+                : "cisco_acl.cfg"}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg neu-raised-sm hover:neu-inset text-[var(--ink-700)] text-xs transition-all cursor-pointer"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check className="w-3.5 h-3.5 text-[var(--allow)]" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? "Copied" : "Copy"}</span>
             </button>
             <button
               onClick={handleDownload}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg neu-raised-sm hover:neu-inset text-[var(--ink-700)] text-xs transition-all cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download</span>
@@ -133,27 +137,36 @@ export function RuleDiffViewer({ compiled, policyId }: RuleDiffViewerProps) {
           </div>
         </div>
 
-        {/* Code Lines with Line Numbers */}
-        <div className="p-4 overflow-x-auto max-h-[480px] leading-relaxed">
+        {/* Lines Container */}
+        <div className="overflow-x-auto max-h-[460px] leading-relaxed text-[12px]">
           {lines.map((line, index) => {
             const isComment = line.trim().startsWith("#") || line.trim().startsWith("!");
             const isDrop = line.includes("drop") || line.includes("DROP") || line.includes("deny");
             const isAccept = line.includes("accept") || line.includes("ACCEPT") || line.includes("permit");
 
             return (
-              <div key={index} className="flex hover:bg-slate-900/60 transition-colors py-0.5">
-                <span className="w-10 text-right pr-4 text-slate-600 select-none shrink-0 font-mono text-[11px]">
+              <div
+                key={index}
+                className={`flex py-0.5 px-1 rounded ${
+                  isDrop
+                    ? "bg-[rgba(179,38,30,0.06)]"
+                    : isAccept && !isComment
+                    ? "bg-[rgba(26,107,67,0.06)]"
+                    : ""
+                }`}
+              >
+                <span className="w-9 text-right pr-4 text-[var(--ink-400)] select-none shrink-0 font-mono text-[11px] tabular-nums">
                   {index + 1}
                 </span>
                 <span
                   className={`flex-1 ${
                     isComment
-                      ? "text-slate-500 italic"
+                      ? "text-[var(--ink-500)] italic"
                       : isDrop
-                      ? "text-rose-400 font-semibold"
+                      ? "text-[var(--deny)] font-semibold"
                       : isAccept
-                      ? "text-emerald-300"
-                      : "text-slate-200"
+                      ? "text-[var(--allow)] font-medium"
+                      : "text-[var(--ink-900)]"
                   }`}
                 >
                   {line}
@@ -164,15 +177,17 @@ export function RuleDiffViewer({ compiled, policyId }: RuleDiffViewerProps) {
         </div>
       </div>
 
-      {/* Packet Hit Counters Mock Bar */}
-      <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex flex-wrap items-center justify-between text-xs font-mono">
-        <div className="flex items-center gap-2 text-slate-400">
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+      {/* Packet Hit Counters Bar */}
+      <div className="p-3 rounded-xl neu-raised-sm flex flex-wrap items-center justify-between text-xs font-mono">
+        <div className="flex items-center gap-2 text-[var(--ink-600)]">
+          <span className="w-2 h-2 rounded-full bg-[var(--allow)]" />
           <span>Kernel Packet Counters:</span>
-          <span className="text-slate-200 font-semibold">cnt_policy: 42 packets / 28.4 KB dropped</span>
+          <span className="text-[var(--ink-900)] font-semibold">
+            cnt_pol: 42 packets / 28.4 KB dropped
+          </span>
         </div>
-        <div className="text-slate-500">
-          Hardware Offload: Inactive (Software Emulation Mode)
+        <div className="text-[var(--ink-500)]">
+          Table: inet intentwall_filter (Stateful conntrack active)
         </div>
       </div>
     </div>
