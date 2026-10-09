@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+*.db
+intentwall.db
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+.npm-cache/
+.npmrc
+
+# Logs & Environment
+*.log
+.env
+.env.local
+.DS_Store

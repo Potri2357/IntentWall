@@ -1,0 +1,35 @@
+# Containerlab Multi-Zone Topology for Intentwall
+# Run with: sudo containerlab deploy -t topologies/containerlab.yml
+
+name: intentwall-lab
+
+topology:
+  nodes:
+    gateway:
+      kind: linux
+      image: ghcr.io/intentwall/linux-firewall:latest
+      cmd: sysctl -w net.ipv4.ip_forward=1
+    guest:
+      kind: linux
+      image: curlimages/curl:latest
+    staff:
+      kind: linux
+      image: curlimages/curl:latest
+    servers:
+      kind: linux
+      image: python:3.12-alpine
+      cmd: python3 -m http.server 80
+    mgmt:
+      kind: linux
+      image: curlimages/curl:latest
+    wan:
+      kind: linux
+      image: python:3.12-alpine
+      cmd: python3 -m http.server 443
+
+  links:
+    - endpoints: ["guest:eth1", "gateway:eth-guest"]
+    - endpoints: ["staff:eth1", "gateway:eth-staff"]
+    - endpoints: ["servers:eth1", "gateway:eth-srv"]
+    - endpoints: ["mgmt:eth1", "gateway:eth-mgmt"]
+    - endpoints: ["wan:eth1", "gateway:eth-wan"]
