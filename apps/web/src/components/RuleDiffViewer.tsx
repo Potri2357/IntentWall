@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { CompiledRuleset } from "@/lib/api";
-import { Copy, Download, Check, ShieldCheck, Layers, FileDiff } from "lucide-react";
+import { Copy, Download, Check, ShieldCheck, FileCode, Layers } from "lucide-react";
 
 interface RuleDiffViewerProps {
   compiled: CompiledRuleset | null;
@@ -15,9 +15,10 @@ export function RuleDiffViewer({ compiled, policyId }: RuleDiffViewerProps) {
 
   if (!compiled) {
     return (
-      <div className="neu-raised-md p-12 text-center text-[var(--ink-500)] border border-[var(--pal-200)]">
+      <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-12 text-center text-[var(--ink-500)] shadow-xs">
         <Layers className="w-8 h-8 text-[var(--ink-400)] mx-auto mb-3" strokeWidth={1.75} />
-        <p className="text-sm">No rules compiled yet. Compile an intent to inspect generated firewall syntax.</p>
+        <p className="text-sm font-medium text-[var(--ink-900)]">No firewall rules compiled yet.</p>
+        <p className="text-xs text-[var(--ink-400)] mt-1">Enter a security intent in the Firewall Console to inspect generated syntax.</p>
       </div>
     );
   }
@@ -45,7 +46,7 @@ export function RuleDiffViewer({ compiled, policyId }: RuleDiffViewerProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `intentwall_${policyId || "policy"}_${activeTab}.${ext}`;
+    a.download = `firewall_${policyId || "rule"}_${activeTab}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -53,141 +54,114 @@ export function RuleDiffViewer({ compiled, policyId }: RuleDiffViewerProps) {
   const lines = getContent().split("\n");
 
   return (
-    <div className="neu-raised-md p-6 border border-[var(--pal-200)] space-y-4">
+    <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-4 transition-colors">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-[var(--pal-200)] gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3.5 border-b border-[var(--border)] gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <FileDiff className="w-4 h-4 text-[var(--ink-700)]" strokeWidth={1.75} />
+            <FileCode className="w-4 h-4 text-[var(--ink-900)]" strokeWidth={2} />
             <h3 className="text-sm font-bold text-[var(--ink-900)]">
-              Multi-Target Rule Compiler & Diff
+              Compiled Firewall Ruleset Inspector
             </h3>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(26,107,67,0.12)] text-[var(--allow)] border border-[rgba(26,107,67,0.3)] flex items-center gap-1 font-mono">
+            <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 font-mono font-semibold">
               <ShieldCheck className="w-3 h-3" />
-              nft -c dry-run valid
+              Syntax Validated
             </span>
           </div>
-          <p className="text-xs text-[var(--ink-500)] mt-0.5 font-sans">{compiled.summary}</p>
+          <p className="text-xs text-[var(--ink-500)] mt-0.5 font-mono">{compiled.summary}</p>
         </div>
 
-        {/* Tab Switcher Pills */}
-        <div className="flex items-center gap-1 p-1 rounded-xl neu-inset">
+        {/* Tab Switcher Buttons */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--surface-well)] border border-[var(--border)]">
           <button
             onClick={() => setActiveTab("nftables")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "nftables"
-                ? "btn-graphite-primary"
-                : "text-[var(--ink-600)] hover:text-[var(--ink-900)]"
+                ? "bg-[var(--ink-900)] text-[var(--bg)] shadow-xs"
+                : "text-[var(--ink-700)] hover:text-[var(--ink-900)]"
             }`}
           >
-            Linux nftables (Primary)
+            Linux nftables
           </button>
           <button
             onClick={() => setActiveTab("iptables")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "iptables"
-                ? "btn-graphite-primary"
-                : "text-[var(--ink-600)] hover:text-[var(--ink-900)]"
+                ? "bg-[var(--ink-900)] text-[var(--bg)] shadow-xs"
+                : "text-[var(--ink-700)] hover:text-[var(--ink-900)]"
             }`}
           >
-            iptables (Legacy)
+            Linux iptables
           </button>
           <button
             onClick={() => setActiveTab("cisco")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "cisco"
-                ? "btn-graphite-primary"
-                : "text-[var(--ink-600)] hover:text-[var(--ink-900)]"
+                ? "bg-[var(--ink-900)] text-[var(--bg)] shadow-xs"
+                : "text-[var(--ink-700)] hover:text-[var(--ink-900)]"
             }`}
           >
-            Cisco Extended ACL
+            Cisco IOS-XE ACL
           </button>
         </div>
       </div>
 
-      {/* Code Well (Inset Well) */}
-      <div className="rounded-xl neu-inset p-4 overflow-hidden font-mono text-xs shadow-inner relative">
-        {/* Actions Floating Toolbar (Glass-Thin) */}
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-[var(--pal-200)] text-[11px] text-[var(--ink-500)]">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[var(--ink-700)]">
-              {activeTab === "nftables"
-                ? "/etc/nftables.conf"
-                : activeTab === "iptables"
-                ? "/etc/iptables/rules.v4"
-                : "cisco_acl.cfg"}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg neu-raised-sm hover:neu-inset text-[var(--ink-700)] text-xs transition-all cursor-pointer"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-[var(--allow)]" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? "Copied" : "Copy"}</span>
-            </button>
-            <button
-              onClick={handleDownload}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg neu-raised-sm hover:neu-inset text-[var(--ink-700)] text-xs transition-all cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download</span>
-            </button>
-          </div>
+      {/* Editor & Actions Bar */}
+      <div className="flex items-center justify-between text-xs font-mono text-[var(--ink-500)]">
+        <div className="flex items-center gap-3">
+          <span>Engine: {activeTab === "nftables" ? "nftables 1.0.9 (table inet filter)" : activeTab === "iptables" ? "iptables v1.8 (filter table)" : "Cisco IOS-XE Extended ACL"}</span>
+          <span>•</span>
+          <span>{lines.length} Lines</span>
         </div>
 
-        {/* Lines Container */}
-        <div className="overflow-x-auto max-h-[460px] leading-relaxed text-[12px]">
-          {lines.map((line, index) => {
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-well)] text-[var(--ink-700)] hover:text-[var(--ink-900)] hover:border-[var(--border-strong)] transition-colors cursor-pointer"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copied ? "Copied" : "Copy Rules"}</span>
+          </button>
+
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-well)] text-[var(--ink-700)] hover:text-[var(--ink-900)] hover:border-[var(--border-strong)] transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Monospace Code Editor Well */}
+      <div className="rounded-xl bg-[var(--surface-well)] border border-[var(--border)] overflow-hidden font-mono text-xs shadow-inner">
+        <div className="max-h-[460px] overflow-y-auto p-4 space-y-1">
+          {lines.map((line, idx) => {
             const isComment = line.trim().startsWith("#") || line.trim().startsWith("!");
             const isDrop = line.includes("drop") || line.includes("DROP") || line.includes("deny");
             const isAccept = line.includes("accept") || line.includes("ACCEPT") || line.includes("permit");
 
             return (
-              <div
-                key={index}
-                className={`flex py-0.5 px-1 rounded ${
-                  isDrop
-                    ? "bg-[rgba(179,38,30,0.06)]"
-                    : isAccept && !isComment
-                    ? "bg-[rgba(26,107,67,0.06)]"
-                    : ""
-                }`}
-              >
-                <span className="w-9 text-right pr-4 text-[var(--ink-400)] select-none shrink-0 font-mono text-[11px] tabular-nums">
-                  {index + 1}
+              <div key={idx} className="flex leading-relaxed hover:bg-[var(--border)]/20 px-1 rounded">
+                <span className="w-10 text-[var(--ink-400)] select-none text-right pr-4 shrink-0 tabular-nums">
+                  {idx + 1}
                 </span>
                 <span
-                  className={`flex-1 ${
+                  className={
                     isComment
                       ? "text-[var(--ink-500)] italic"
                       : isDrop
-                      ? "text-[var(--deny)] font-semibold"
+                      ? "text-red-600 dark:text-red-400 font-semibold"
                       : isAccept
-                      ? "text-[var(--allow)] font-medium"
+                      ? "text-emerald-700 dark:text-emerald-400 font-medium"
                       : "text-[var(--ink-900)]"
-                  }`}
+                  }
                 >
-                  {line}
+                  {line || " "}
                 </span>
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Packet Hit Counters Bar */}
-      <div className="p-3 rounded-xl neu-raised-sm flex flex-wrap items-center justify-between text-xs font-mono">
-        <div className="flex items-center gap-2 text-[var(--ink-600)]">
-          <span className="w-2 h-2 rounded-full bg-[var(--allow)]" />
-          <span>Kernel Packet Counters:</span>
-          <span className="text-[var(--ink-900)] font-semibold">
-            cnt_pol: 42 packets / 28.4 KB dropped
-          </span>
-        </div>
-        <div className="text-[var(--ink-500)]">
-          Table: inet intentwall_filter (Stateful conntrack active)
         </div>
       </div>
     </div>

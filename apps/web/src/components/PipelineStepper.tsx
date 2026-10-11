@@ -1,31 +1,60 @@
 "use client";
 
 import React from "react";
-import { Sparkles, ShieldCheck, FileCode, FlaskConical, CircleCheck, Circle, LoaderCircle, CircleX } from "lucide-react";
+import { Sparkles, ShieldCheck, FileCode, FlaskConical, CheckCircle2, Loader2, Check } from "lucide-react";
 
+export type StepStage = "understanding" | "validating" | "compiling" | "simulating" | "verified" | "idle";
 export type StepState = "pending" | "running" | "completed" | "failed";
 
 interface PipelineStepperProps {
-  currentStage: "understanding" | "validating" | "compiling" | "simulating" | "verified" | "idle";
+  currentStage: StepStage;
   failedStage?: string | null;
+  onSelectStep?: (stage: StepStage) => void;
 }
 
-export function PipelineStepper({ currentStage, failedStage }: PipelineStepperProps) {
-  const steps = [
-    { id: "understanding", label: "Understanding", icon: Sparkles },
-    { id: "validating", label: "Validating", icon: ShieldCheck },
-    { id: "compiling", label: "Compiling", icon: FileCode },
-    { id: "simulating", label: "Simulating", icon: FlaskConical },
-    { id: "verified", label: "Verified", icon: CircleCheck },
+export function PipelineStepper({ currentStage, failedStage, onSelectStep }: PipelineStepperProps) {
+  const steps: { id: StepStage; label: string; tooltip: string; icon: any }[] = [
+    {
+      id: "understanding",
+      label: "Intent Intake",
+      tooltip: "Step 1: Parse natural language intent into structured Intermediate Representation (IR)",
+      icon: Sparkles,
+    },
+    {
+      id: "validating",
+      label: "Lockout Check",
+      tooltip: "Step 2: Verify safety invariants and prevent port 22 / management SSH lockout",
+      icon: ShieldCheck,
+    },
+    {
+      id: "compiling",
+      label: "Rule Synthesis",
+      tooltip: "Step 3: Compile validated IR into deterministic Linux nftables and iptables rules",
+      icon: FileCode,
+    },
+    {
+      id: "simulating",
+      label: "Sandbox Probes",
+      tooltip: "Step 4: Execute 7 automated traffic probes in isolated network namespace sandbox",
+      icon: FlaskConical,
+    },
+    {
+      id: "verified",
+      label: "Evidence Verified",
+      tooltip: "Step 5: Review packet journeys, drop counters, and zero-collateral proof",
+      icon: CheckCircle2,
+    },
   ];
 
-  const getStatus = (stepId: string): StepState => {
+  const getStatus = (stepId: StepStage): StepState => {
     if (failedStage === stepId) return "failed";
-    const order = ["understanding", "validating", "compiling", "simulating", "verified"];
+    const order: StepStage[] = ["understanding", "validating", "compiling", "simulating", "verified"];
     const currentIndex = order.indexOf(currentStage);
     const stepIndex = order.indexOf(stepId);
 
-    if (currentStage === "idle") return "pending";
+    if (currentStage === "idle") {
+      return "pending";
+    }
     if (stepIndex < currentIndex) return "completed";
     if (stepIndex === currentIndex) {
       return currentStage === "verified" ? "completed" : "running";
@@ -34,54 +63,67 @@ export function PipelineStepper({ currentStage, failedStage }: PipelineStepperPr
   };
 
   return (
-    <div className="w-full neu-raised-sm p-3.5 border border-[var(--pal-200)] flex items-center justify-between gap-2 overflow-x-auto select-none">
+    <div className="w-full bg-[var(--surface-card)] text-[var(--ink-900)] p-2.5 sm:p-3 rounded-2xl border border-[var(--border)] shadow-sm flex items-center justify-between gap-1 sm:gap-2 overflow-x-auto select-none transition-colors">
       {steps.map((step, idx) => {
         const status = getStatus(step.id);
         const Icon = step.icon;
         const isLast = idx === steps.length - 1;
+        const isCurrent = currentStage === step.id;
 
         return (
           <React.Fragment key={step.id}>
-            <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onSelectStep && onSelectStep(step.id)}
+              title={step.tooltip}
+              aria-label={step.label}
+              className={`group flex items-center gap-2.5 px-3.5 py-2 rounded-xl transition-all cursor-pointer shrink-0 text-left ${
+                isCurrent
+                  ? "bg-[var(--surface-well)] ring-1 ring-[var(--border-strong)] shadow-xs"
+                  : "hover:bg-[var(--surface-well)] hover:ring-1 hover:ring-[var(--border)]"
+              }`}
+            >
+              {/* Badge Icon matching swatch design */}
               <div
-                className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all ${
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                   status === "completed"
-                    ? "bg-[rgba(26,107,67,0.12)] text-[var(--allow)] border border-[rgba(26,107,67,0.3)]"
+                    ? "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 shadow-xs"
                     : status === "running"
-                    ? "neu-inset text-[var(--ink-900)] border border-[var(--ink-500)]"
-                    : status === "failed"
-                    ? "bg-[rgba(179,38,30,0.12)] text-[var(--deny)] border border-[rgba(179,38,30,0.3)]"
-                    : "neu-raised-sm text-[var(--ink-500)] opacity-60"
+                    ? "bg-[var(--ink-900)] text-[var(--bg)] shadow-md ring-2 ring-[var(--ink-900)]/20"
+                    : "bg-[var(--surface-well)] text-[var(--ink-400)] border border-[var(--border)]"
                 }`}
               >
                 {status === "running" ? (
-                  <LoaderCircle className="w-4 h-4 animate-spin text-[var(--ink-900)]" strokeWidth={1.75} />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : status === "completed" ? (
-                  <CircleCheck className="w-4 h-4 text-[var(--allow)]" strokeWidth={1.75} />
-                ) : status === "failed" ? (
-                  <CircleX className="w-4 h-4 text-[var(--deny)]" strokeWidth={1.75} />
+                  <Check className="w-4 h-4 stroke-[2.75]" />
                 ) : (
-                  <Icon className="w-3.5 h-3.5" strokeWidth={1.75} />
+                  <Icon className="w-3.5 h-3.5" />
                 )}
               </div>
 
-              <span
-                className={`text-xs font-mono font-medium ${
-                  status === "running"
-                    ? "text-[var(--ink-900)] font-bold"
-                    : status === "completed"
-                    ? "text-[var(--ink-700)]"
-                    : status === "failed"
-                    ? "text-[var(--deny)] font-bold"
-                    : "text-[var(--ink-500)]"
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
+              {/* Label */}
+              <div>
+                <span
+                  className={`text-xs font-mono tracking-tight block whitespace-nowrap transition-colors ${
+                    status === "completed"
+                      ? "text-[var(--ink-700)] group-hover:text-[var(--ink-900)] font-medium"
+                      : status === "running"
+                      ? "text-[var(--ink-900)] font-bold"
+                      : "text-[var(--ink-500)] group-hover:text-[var(--ink-700)]"
+                  }`}
+                >
+                  {step.label}
+                </span>
+                <span className="text-[9px] font-mono block uppercase tracking-wider text-[var(--ink-400)]">
+                  {status === "completed" ? "Done" : status === "running" ? "Active" : "Ready"}
+                </span>
+              </div>
+            </button>
 
+            {/* Connecting line */}
             {!isLast && (
-              <div className="flex-1 min-w-4 max-w-12 h-[1px] bg-[var(--pal-200)] mx-1" />
+              <div className="flex-1 min-w-4 max-w-10 h-[1px] bg-[var(--border)] mx-1 shrink-0" />
             )}
           </React.Fragment>
         );

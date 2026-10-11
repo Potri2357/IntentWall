@@ -47,13 +47,12 @@ export function CommandPalette({
   if (!isOpen) return null;
 
   const actions = [
-    { label: "Go to Command Center", tab: "command", icon: LayoutDashboard },
-    { label: "Open Simulation Lab", tab: "simulation", icon: FlaskConical },
+    { label: "Go to Firewall Console", tab: "command", icon: LayoutDashboard },
+    { label: "Open Simulation Probes", tab: "simulation", icon: FlaskConical },
     { label: "View Policy Library", tab: "policies", icon: Library },
     { label: "Inspect Rule Diff (nftables)", tab: "diff", icon: FileDiff },
     { label: "Open Audit Trail", tab: "audit", icon: ScrollText },
-    { label: "Inspect Network & Service Catalog", tab: "inventory", icon: Network },
-    { label: "Run 100-Prompt Benchmark", tab: "benchmark", icon: Activity },
+    { label: "Inspect Network Architecture", tab: "inventory", icon: Network },
     { label: "Configure Settings", tab: "settings", icon: Settings },
   ];
 
@@ -72,26 +71,23 @@ export function CommandPalette({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 px-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-150">
-      <div
-        className="w-full max-w-xl glass-strong rounded-2xl p-4 border border-[var(--pal-200)] shadow-2xl relative"
-        style={{ backdropFilter: "blur(24px)" }}
-      >
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 px-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="w-full max-w-xl bg-[var(--surface-card)] rounded-2xl p-4 border border-[var(--border)] shadow-2xl relative">
         {/* Search Input */}
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl neu-inset">
-          <Search className="w-4 h-4 text-[var(--ink-500)] shrink-0" strokeWidth={1.75} />
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--surface-well)] border border-[var(--border)]">
+          <Search className="w-4 h-4 text-[var(--grey-1)] shrink-0" strokeWidth={1.75} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search views, actions, or firewall scenarios..."
             autoFocus
-            className="w-full bg-transparent text-sm text-[var(--ink-900)] placeholder:text-[var(--ink-500)] focus:outline-none"
+            className="w-full bg-transparent text-sm text-[var(--text-main)] placeholder:text-[var(--grey-1)] focus:outline-none font-sans"
           />
           <button
             onClick={onClose}
             aria-label="Close Command Palette"
-            className="text-[var(--ink-500)] hover:text-[var(--ink-900)] cursor-pointer"
+            className="text-[var(--grey-1)] hover:text-[var(--text-main)] cursor-pointer"
           >
             <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
@@ -101,7 +97,7 @@ export function CommandPalette({
         <div className="mt-3 max-h-80 overflow-y-auto space-y-3 pr-1 text-xs">
           {/* Navigation Items */}
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--ink-500)] px-2 block mb-1">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--grey-1)] px-2 block mb-1">
               Navigation
             </span>
             <div className="space-y-1">
@@ -114,9 +110,9 @@ export function CommandPalette({
                       onSelectTab(item.tab);
                       onClose();
                     }}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left neu-raised-sm hover:neu-inset text-[var(--ink-700)] hover:text-[var(--ink-900)] transition-all cursor-pointer"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left bg-[var(--surface-card)] hover:bg-[var(--surface-well)] border border-transparent hover:border-[var(--border)] text-[var(--text-main)] transition-all cursor-pointer"
                   >
-                    <Icon className="w-4 h-4 text-[var(--ink-500)]" strokeWidth={1.75} />
+                    <Icon className="w-4 h-4 text-[var(--grey-1)]" strokeWidth={1.75} />
                     <span>{item.label}</span>
                   </button>
                 );
@@ -126,7 +122,7 @@ export function CommandPalette({
 
           {/* Quick Scenario Prompts */}
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--ink-500)] px-2 block mb-1">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--grey-1)] px-2 block mb-1">
               Security Scenarios
             </span>
             <div className="space-y-1">
@@ -137,9 +133,9 @@ export function CommandPalette({
                     onSelectPrompt(preset.prompt);
                     onClose();
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left neu-raised-sm hover:neu-inset text-[var(--ink-700)] hover:text-[var(--ink-900)] transition-all cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left bg-[var(--surface-card)] hover:bg-[var(--surface-well)] border border-transparent hover:border-[var(--border)] text-[var(--text-main)] transition-all cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 text-[var(--ink-500)]" strokeWidth={1.75} />
+                  <Sparkles className="w-4 h-4 text-[var(--grey-1)]" strokeWidth={1.75} />
                   <span className="font-mono text-[11px] truncate">{preset.label}</span>
                 </button>
               ))}
@@ -148,7 +144,7 @@ export function CommandPalette({
         </div>
 
         {/* Footer shortcuts */}
-        <div className="mt-3 pt-2.5 border-t border-[var(--pal-200)] flex items-center justify-between text-[11px] text-[var(--ink-500)] font-mono">
+        <div className="mt-3 pt-2.5 border-t border-[var(--border)] flex items-center justify-between text-[11px] text-[var(--grey-1)] font-mono">
           <span>Esc to exit</span>
           <span>Enter to select</span>
         </div>

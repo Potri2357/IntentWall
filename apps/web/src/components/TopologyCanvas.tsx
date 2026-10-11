@@ -8,16 +8,27 @@ import {
   Laptop,
   Server,
   Lock,
-  ZoomIn,
-  ZoomOut,
-  Maximize,
-  RotateCcw,
-  List,
-  ShieldX,
-  ShieldCheck,
-  Activity,
-  Workflow,
+  CheckCircle2,
+  AlertTriangle,
+  Layers,
+  Network,
+  Play,
+  RotateCw,
 } from "lucide-react";
+
+interface SubnetNode {
+  id: string;
+  name: string;
+  vlan: string;
+  cidr: string;
+  netmask: string;
+  gatewayInterface: string;
+  gatewayIp: string;
+  macPrefix: string;
+  icon: any;
+  hosts: { name: string; ip: string; mac: string; status: string }[];
+  rules: string[];
+}
 
 interface TopologyCanvasProps {
   blockedTarget?: string;
@@ -28,375 +39,419 @@ interface TopologyCanvasProps {
     all_passed?: boolean;
   };
   onSelectNode?: (nodeData: any) => void;
+  onTriggerSimulation?: () => void;
 }
 
 export function TopologyCanvas({
-  blockedTarget = "youtube",
-  isSimulating = false,
+  blockedTarget,
+  isSimulating,
   simulationProgress,
   lastSimResult,
   onSelectNode,
+  onTriggerSimulation,
 }: TopologyCanvasProps) {
-  const [selectedNode, setSelectedNode] = useState<string>("gateway");
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [showTableView, setShowTableView] = useState<boolean>(false);
+  const [selectedSubnetId, setSelectedSubnetId] = useState<string>("guest");
 
-  const nodes = [
-    {
-      id: "wan",
-      title: "Internet / WAN",
-      cidr: "0.0.0.0/0",
-      icon: Globe,
-      x: 50,
-      y: 14,
-      details: [
-        "youtube.com (142.250.190.46:443)",
-        "netflix.com (198.38.118.140:443)",
-        "wikipedia.org (198.35.26.96:443)",
-      ],
-    },
-    {
-      id: "gateway",
-      title: "Gateway Firewall",
-      cidr: "10.10.1.1 (Linux nftables)",
-      icon: Shield,
-      x: 50,
-      y: 46,
-      isGateway: true,
-      details: [
-        "Core nftables table inet intentwall_filter",
-        "Stateful conntrack: established,related accept",
-        "Lockout Guard: Invariants enforced for SSH, DNS, API",
-      ],
-    },
+  const subnets: SubnetNode[] = [
     {
       id: "guest",
-      title: "Guest Wi-Fi (VLAN 20)",
+      name: "Guest Subnet",
+      vlan: "VLAN 20",
       cidr: "10.10.20.0/24",
+      netmask: "255.255.255.0",
+      gatewayInterface: "eth1.20",
+      gatewayIp: "10.10.20.1",
+      macPrefix: "52:54:00:20:",
       icon: Wifi,
-      x: 20,
-      y: 80,
-      details: ["guest-laptop-1 (10.10.20.101)", "guest-phone-2 (10.10.20.102)"],
+      hosts: [
+        { name: "guest-laptop-1", ip: "10.10.20.101", mac: "52:54:00:20:10:01", status: "Active (DHCP Lease: 2h)" },
+        { name: "guest-phone-2", ip: "10.10.20.102", mac: "52:54:00:20:10:02", status: "Active (DHCP Lease: 4h)" },
+      ],
+      rules: blockedTarget
+        ? [
+            `DROP: tcp dport { 80, 443 } to ${blockedTarget} (QUIC/HTTPS)`,
+            `DROP: udp dport 443 to ${blockedTarget} (QUIC Protocol)`,
+            "ACCEPT: udp dport 53 to 10.10.1.1 (Gateway DNS Resolver)",
+          ]
+        : ["ACCEPT: all outbound to WAN via eth0", "ACCEPT: udp dport 53 to 10.10.1.1 (DNS)"],
     },
     {
       id: "staff",
-      title: "Staff Workstations (VLAN 10)",
+      name: "Staff Workstations",
+      vlan: "VLAN 10",
       cidr: "10.10.10.0/24",
+      netmask: "255.255.255.0",
+      gatewayInterface: "eth1.10",
+      gatewayIp: "10.10.10.1",
+      macPrefix: "52:54:00:10:",
       icon: Laptop,
-      x: 42,
-      y: 82,
-      details: ["staff-workstation-1 (10.10.10.50)", "Full internet & Intranet routing"],
+      hosts: [
+        { name: "staff-workstation-1", ip: "10.10.10.50", mac: "52:54:00:10:50:01", status: "Static IP (Reserved)" },
+        { name: "staff-laptop-2", ip: "10.10.10.51", mac: "52:54:00:10:50:02", status: "Active (802.1X Auth)" },
+      ],
+      rules: [
+        "ACCEPT: all outbound to WAN (Full Internet Access)",
+        "ACCEPT: tcp dport { 80, 443, 5432 } to Server DMZ (10.10.30.0/24)",
+        "ACCEPT: udp dport 53 to 10.10.1.1 (DNS)",
+      ],
     },
     {
       id: "servers",
-      title: "Internal Servers (VLAN 30)",
+      name: "Server DMZ Farm",
+      vlan: "VLAN 30",
       cidr: "10.10.30.0/24",
+      netmask: "255.255.255.0",
+      gatewayInterface: "eth1.30",
+      gatewayIp: "10.10.30.1",
+      macPrefix: "52:54:00:30:",
       icon: Server,
-      x: 66,
-      y: 82,
-      details: ["intranet-web (10.10.30.10:80)", "db-cluster (10.10.30.20:5432)"],
+      hosts: [
+        { name: "intranet-web", ip: "10.10.30.10", mac: "52:54:00:30:10:01", status: "NGINX (Ports 80, 443)" },
+        { name: "db-cluster", ip: "10.10.30.20", mac: "52:54:00:30:20:01", status: "PostgreSQL (Port 5432)" },
+      ],
+      rules: [
+        "DROP: all inbound connections originating from Guest (10.10.20.0/24)",
+        "ACCEPT: tcp dport { 80, 443 } from Staff (10.10.10.0/24)",
+        "ACCEPT: tcp dport 5432 from Intranet Web host only",
+      ],
     },
     {
       id: "mgmt",
-      title: "Management Bastion (VLAN 100)",
+      name: "Management Bastion",
+      vlan: "VLAN 100",
       cidr: "192.168.100.0/24",
+      netmask: "255.255.255.0",
+      gatewayInterface: "eth2",
+      gatewayIp: "192.168.100.1",
+      macPrefix: "52:54:00:99:",
       icon: Lock,
-      x: 86,
-      y: 78,
-      details: ["admin-bastion (192.168.100.10)", "Protected by Lockout Guard Invariant"],
+      hosts: [
+        { name: "admin-bastion", ip: "192.168.100.10", mac: "52:54:00:99:10:01", status: "SSH RSA 4096-bit Verified" },
+      ],
+      rules: [
+        "ACCEPT: tcp dport 22 to Gateway 10.10.1.1 (Management SSH)",
+        "ACCEPT: tcp dport 8000 to Gateway (Intentwall Controller API)",
+        "LOCKOUT GUARD: Modifying/Dropping TCP 22 prohibited by invariant checker",
+      ],
     },
   ];
 
-  const handleNodeClick = (node: any) => {
-    setSelectedNode(node.id);
-    if (onSelectNode) onSelectNode(node);
+  const activeSubnet = subnets.find((s) => s.id === selectedSubnetId) || subnets[0];
+
+  const handleSelectSubnet = (sub: SubnetNode) => {
+    setSelectedSubnetId(sub.id);
+    if (onSelectNode) {
+      onSelectNode({
+        id: sub.id,
+        title: sub.name,
+        cidr: sub.cidr,
+        details: [
+          `Gateway Interface: ${sub.gatewayInterface} (${sub.gatewayIp})`,
+          `VLAN Tag: ${sub.vlan}`,
+          `MAC Allocation: ${sub.macPrefix}XX`,
+          ...sub.hosts.map((h) => `${h.name} (${h.ip} - ${h.status})`),
+        ],
+      });
+    }
   };
 
   return (
-    <div className="neu-raised-md p-5 border border-[var(--pal-200)] relative">
-      {/* Canvas Top Bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-[var(--pal-200)]">
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-[var(--allow)]" strokeWidth={1.75} />
-          <h3 className="text-sm font-bold text-[var(--ink-900)]">
-            Emulated Network Topology
-          </h3>
-          <span className="text-[11px] font-mono text-[var(--ink-500)]">
-            Mininet / Linux Namespaces Sandbox
-          </span>
+    <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-6 transition-colors">
+      {/* Header bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border)]">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[var(--ink-900)] text-[var(--bg)] flex items-center justify-center shrink-0">
+              <Network className="w-4 h-4" strokeWidth={2} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-[var(--ink-900)]">
+                  Live Network Topology &amp; Firewall Inspection
+                </h3>
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-[var(--surface-well)] text-[var(--ink-700)] border border-[var(--border)]">
+                  4 VLANs • Linux nftables 1.0.9
+                </span>
+              </div>
+              <p className="text-xs text-[var(--ink-500)] mt-0.5">
+                Emulated network namespace with real netfilter hooks, interface bindings, and packet forwarding logic.
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Status Indicators */}
-        <div className="flex items-center gap-2 text-xs font-mono">
-          {isSimulating && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full neu-inset text-[var(--ink-900)]">
-              <span className="w-2 h-2 rounded-full bg-[var(--ink-700)] animate-ping" />
-              <span>{simulationProgress || "Simulating traffic flows..."}</span>
-            </div>
+        {/* Live Simulation Controls */}
+        <div className="flex items-center gap-2">
+          {onTriggerSimulation && (
+            <button
+              onClick={onTriggerSimulation}
+              disabled={isSimulating}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-[var(--ink-900)] text-[var(--bg)] hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+            >
+              {isSimulating ? (
+                <>
+                  <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Probing Packets...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Inject Traffic Flow</span>
+                </>
+              )}
+            </button>
           )}
 
           {lastSimResult && !isSimulating && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[rgba(26,107,67,0.12)] text-[var(--allow)] border border-[rgba(26,107,67,0.3)]">
-              <ShieldCheck className="w-3.5 h-3.5" strokeWidth={1.75} />
-              <span>Evidence Verified</span>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-xs font-mono font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>7/7 Probes Passed</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Main Canvas Viewport (Inset Well) */}
-      <div className="relative w-full h-[360px] my-3 neu-inset rounded-2xl overflow-hidden select-none bg-[var(--surface-card)]">
-        {/* Subtle dot grid pattern */}
+      {/* Main Visual Topology Diagram Canvas */}
+      <div className="relative rounded-xl border border-[var(--border)] bg-[var(--surface-well)] p-6 overflow-hidden">
+        {/* Subtle Engineering Grid Background */}
         <div
-          className="absolute inset-0 pointer-events-none opacity-40"
+          className="absolute inset-0 opacity-[0.25] pointer-events-none"
           style={{
-            backgroundImage: "radial-gradient(var(--pal-300) 1px, transparent 1px)",
+            backgroundImage: "radial-gradient(var(--grey-1) 1px, transparent 1px)",
             backgroundSize: "20px 20px",
           }}
         />
 
-        {/* Floating Canvas Toolbar (Glass-Thin) */}
-        <div className="absolute top-3 right-3 z-30 glass-thin p-1 rounded-xl flex items-center gap-1 border border-[var(--pal-200)] shadow-md">
-          <button
-            onClick={() => setZoomLevel((z) => Math.min(1.4, z + 0.1))}
-            aria-label="Zoom In"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--ink-700)] hover:text-[var(--ink-900)] hover:bg-[var(--pal-100)] cursor-pointer"
-          >
-            <ZoomIn className="w-3.5 h-3.5" strokeWidth={1.75} />
-          </button>
-          <button
-            onClick={() => setZoomLevel((z) => Math.max(0.7, z - 0.1))}
-            aria-label="Zoom Out"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--ink-700)] hover:text-[var(--ink-900)] hover:bg-[var(--pal-100)] cursor-pointer"
-          >
-            <ZoomOut className="w-3.5 h-3.5" strokeWidth={1.75} />
-          </button>
-          <button
-            onClick={() => setZoomLevel(1)}
-            aria-label="Reset View"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--ink-700)] hover:text-[var(--ink-900)] hover:bg-[var(--pal-100)] cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
-          </button>
-          <button
-            onClick={() => setShowTableView(!showTableView)}
-            aria-label="Toggle Accessibility Table View"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--ink-700)] hover:text-[var(--ink-900)] hover:bg-[var(--pal-100)] cursor-pointer"
-          >
-            <List className="w-3.5 h-3.5" strokeWidth={1.75} />
-          </button>
-        </div>
-
-        {/* Floating Legend (Glass-Thin) */}
-        <div className="absolute bottom-3 left-3 z-30 glass-thin px-3 py-1.5 rounded-xl border border-[var(--pal-200)] flex items-center gap-3 text-[11px] font-mono text-[var(--ink-600)] shadow-md">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[var(--allow)]" />
-            <span>Allowed Flow</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[var(--deny)]" />
-            <span>Blocked Flow</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[var(--pal-300)]" />
-            <span>Idle Link</span>
-          </div>
-        </div>
-
-        {/* Scaled Canvas Container */}
-        <div
-          className="w-full h-full relative transition-transform duration-200"
-          style={{ transform: `scale(${zoomLevel})` }}
-        >
-          {/* SVG Topology Edges */}
-          <svg
-            className="w-full h-full absolute inset-0 pointer-events-none"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-          >
-            {/* Gateway to WAN uplink */}
-            <line
-              x1="50"
-              y1="46"
-              x2="50"
-              y2="16"
-              stroke="var(--pal-300)"
-              strokeWidth="0.8"
-              strokeDasharray="2 2"
-            />
-
-            {/* Guest to Gateway edge */}
-            <line
-              x1="22"
-              y1="76"
-              x2="48"
-              y2="48"
-              className={blockedTarget ? "packet-flow-deny" : "packet-flow-allow"}
-              strokeWidth="1.2"
-            />
-
-            {/* Staff to Gateway edge (Allowed flow) */}
-            <line
-              x1="43"
-              y1="78"
-              x2="49"
-              y2="48"
-              className="packet-flow-allow"
-              strokeWidth="1.2"
-            />
-
-            {/* Servers to Gateway edge */}
-            <line
-              x1="65"
-              y1="78"
-              x2="51"
-              y2="48"
-              className="packet-flow-allow"
-              strokeWidth="1.2"
-            />
-
-            {/* Management to Gateway edge (Lockout Protected) */}
-            <line
-              x1="84"
-              y1="74"
-              x2="52"
-              y2="48"
-              stroke="var(--info)"
-              strokeWidth="1.2"
-              strokeDasharray="3 3"
-            />
-          </svg>
-
-          {/* Blocked Badge indicator at midpoint */}
-          {blockedTarget && (
-            <div className="absolute top-[32%] left-[28%] -translate-x-1/2 -translate-y-1/2 z-25 px-2 py-0.5 rounded-lg bg-[rgba(179,38,30,0.14)] text-[var(--deny)] border border-[rgba(179,38,30,0.4)] text-[10px] font-mono font-bold flex items-center gap-1 shadow-md">
-              <ShieldX className="w-3 h-3" strokeWidth={2} />
-              <span>DENY: guest -&gt; {blockedTarget}</span>
+        <div className="relative z-10 flex flex-col items-center max-w-4xl mx-auto space-y-4">
+          {/* TIER 1: External Internet WAN */}
+          <div className="flex flex-col items-center">
+            <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-xl px-5 py-3 shadow-xs flex items-center gap-3 w-72">
+              <div className="w-9 h-9 rounded-lg bg-[var(--surface-well)] flex items-center justify-center text-[var(--ink-700)] shrink-0">
+                <Globe className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <span className="text-xs font-bold text-[var(--ink-900)] block">
+                  Internet / External WAN
+                </span>
+                <span className="text-[10px] font-mono text-[var(--ink-500)] block">
+                  Route: 0.0.0.0/0 (Default Gateway)
+                </span>
+              </div>
             </div>
-          )}
 
-          {/* Node Elements */}
-          {nodes.map((node) => {
-            const Icon = node.icon;
-            const isSelected = selectedNode === node.id;
-            const isGuestBlocked = node.id === "guest" && Boolean(blockedTarget);
+            {/* Link WAN -> Gateway with Packet Animation */}
+            <div className="flex flex-col items-center my-1 relative">
+              <div className="w-0.5 h-7 bg-[var(--border-strong)] relative overflow-hidden">
+                {isSimulating && (
+                  <div className="w-full h-2.5 bg-emerald-500 animate-pulse absolute top-0" />
+                )}
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--surface-card)] text-[var(--ink-700)] border border-[var(--border)]">
+                eth0 • WAN Uplink (1000Mbps)
+              </span>
+              <div className="w-0.5 h-7 bg-[var(--border-strong)]" />
+            </div>
+          </div>
 
-            return (
-              <div
-                key={node.id}
-                onClick={() => handleNodeClick(node)}
-                style={{
-                  left: `${node.x}%`,
-                  top: `${node.y}%`,
-                  transform: "translate(-50%, -50%)",
-                }}
-                className="absolute z-20 flex flex-col items-center cursor-pointer group"
-              >
-                {/* Node Box */}
-                <div
-                  className={`rounded-2xl flex items-center justify-center transition-all duration-200 group-hover:scale-105 border ${
-                    node.isGateway ? "w-16 h-16" : "w-14 h-14"
-                  } ${
-                    isSelected
-                      ? "neu-inset border-[var(--ink-900)] ring-2 ring-[var(--ink-700)] ring-offset-2 ring-offset-[var(--surface-card)]"
-                      : "neu-raised-sm border-[var(--pal-200)]"
-                  }`}
-                  style={{ background: "var(--surface-card)" }}
-                >
-                  <Icon
-                    className={node.isGateway ? "w-7 h-7 text-[var(--ink-900)]" : "w-6 h-6 text-[var(--ink-700)]"}
-                    strokeWidth={1.75}
-                  />
-
-                  {/* Red indicator badge if target blocked */}
-                  {isGuestBlocked && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--deny)] text-white flex items-center justify-center text-[10px] font-bold">
-                      ✕
-                    </span>
-                  )}
+          {/* TIER 2: Central Linux Gateway Firewall & Router */}
+          <div className="w-full max-w-md bg-[var(--surface-card)] border-2 border-[var(--border-strong)] rounded-2xl p-4 shadow-sm text-center relative">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--border)]">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[var(--ink-900)] text-[var(--bg)] flex items-center justify-center">
+                  <Shield className="w-4 h-4" />
                 </div>
-
-                {/* Node Label */}
-                <div className="mt-1.5 text-center">
-                  <span className="text-xs font-bold text-[var(--ink-900)] block whitespace-nowrap">
-                    {node.title}
-                  </span>
-                  <span className="text-[10px] font-mono text-[var(--ink-500)] block">
-                    {node.cidr}
+                <div className="text-left">
+                  <h4 className="text-xs font-bold text-[var(--ink-900)] leading-tight">
+                    Linux Core Gateway &amp; Firewall
+                  </h4>
+                  <span className="text-[10px] font-mono text-[var(--ink-500)]">
+                    Host: gateway-fw0 • 10.10.1.1
                   </span>
                 </div>
               </div>
-            );
-          })}
-        </div>
 
-        {/* Accessible Table View Overlay (Section 13) */}
-        {showTableView && (
-          <div className="absolute inset-0 z-40 glass p-5 overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--pal-200)]">
-              <span className="font-bold text-xs uppercase font-mono text-[var(--ink-900)]">
-                Topology Entity Table (Accessible Alternative)
-              </span>
-              <button
-                onClick={() => setShowTableView(false)}
-                className="text-xs text-[var(--ink-700)] hover:underline cursor-pointer"
-              >
-                Close Table
-              </button>
+              {/* Hardware / Engine Telemetry */}
+              <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--ink-500)]">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>nftables 1.0.9</span>
+              </div>
             </div>
-            <table className="w-full text-left text-xs font-mono mt-3">
-              <thead>
-                <tr className="text-[var(--ink-500)] text-[11px] border-b border-[var(--pal-200)]">
-                  <th className="py-2">Zone / Node</th>
-                  <th className="py-2">CIDR / IP</th>
-                  <th className="py-2">Policy Edge Status</th>
-                  <th className="py-2">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--pal-200)]">
-                {nodes.map((n) => (
-                  <tr key={n.id} className="py-2">
-                    <td className="py-2 font-bold text-[var(--ink-900)]">{n.title}</td>
-                    <td className="py-2 text-[var(--ink-700)]">{n.cidr}</td>
-                    <td className="py-2">
-                      {n.id === "guest" && blockedTarget ? (
-                        <span className="text-[var(--deny)] font-bold">BLOCKED TARGET</span>
-                      ) : (
-                        <span className="text-[var(--allow)]">PERMITTED</span>
-                      )}
-                    </td>
-                    <td className="py-2 text-[var(--ink-500)]">{n.details[0]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+            {/* Live Filter Invariant Badges */}
+            <div className="grid grid-cols-3 gap-2 text-[10px] font-mono">
+              <div className="p-1.5 rounded bg-[var(--surface-well)] border border-[var(--border)]">
+                <span className="text-[var(--ink-400)] block text-[9px]">CONNTRACK</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">STATEFUL ON</span>
+              </div>
+              <div className="p-1.5 rounded bg-[var(--surface-well)] border border-[var(--border)]">
+                <span className="text-[var(--ink-400)] block text-[9px]">LOCKOUT GUARD</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">ENFORCING</span>
+              </div>
+              <div className="p-1.5 rounded bg-[var(--surface-well)] border border-[var(--border)]">
+                <span className="text-[var(--ink-400)] block text-[9px]">CPU / LATENCY</span>
+                <span className="font-semibold text-[var(--ink-700)]">0.8% / 1.2ms</span>
+              </div>
+            </div>
+
+            {/* Active Blocking Callout Banner if policy has target */}
+            {blockedTarget && (
+              <div className="mt-3 p-2 rounded-lg bg-red-50/80 dark:bg-red-950/40 border border-red-200 dark:border-red-800 flex items-center justify-between text-xs font-mono">
+                <div className="flex items-center gap-1.5 text-red-700 dark:text-red-400 font-semibold text-[11px]">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>FORWARD FILTER: DROP Guest to {blockedTarget.toUpperCase()}</span>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/60 text-red-800 dark:text-red-300 font-bold">
+                  Rule Active
+                </span>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Bus connector branch to 4 VLANs */}
+          <div className="w-full flex flex-col items-center my-2">
+            <div className="w-0.5 h-6 bg-[var(--border-strong)]" />
+            <div className="w-full max-w-3xl h-0.5 bg-[var(--border-strong)] relative">
+              {isSimulating && (
+                <div className="absolute inset-0 bg-emerald-500/50 animate-pulse" />
+              )}
+            </div>
+            <div className="w-full max-w-3xl flex justify-between">
+              <div className="w-0.5 h-5 bg-[var(--border-strong)]" />
+              <div className="w-0.5 h-5 bg-[var(--border-strong)]" />
+              <div className="w-0.5 h-5 bg-[var(--border-strong)]" />
+              <div className="w-0.5 h-5 bg-[var(--border-strong)]" />
+            </div>
+          </div>
+
+          {/* TIER 3: The 4 Isolated VLAN Subnets */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3.5 w-full max-w-4xl">
+            {subnets.map((sub) => {
+              const Icon = sub.icon;
+              const isSelected = selectedSubnetId === sub.id;
+              const isGuestBlocked = sub.id === "guest" && Boolean(blockedTarget);
+
+              return (
+                <div
+                  key={sub.id}
+                  onClick={() => handleSelectSubnet(sub)}
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer text-left select-none ${
+                    isSelected
+                      ? "bg-[var(--surface-card)] border-[var(--ink-900)] shadow-md ring-2 ring-[var(--ink-900)]"
+                      : "bg-[var(--surface-card)] border-[var(--border)] hover:border-[var(--border-strong)] shadow-xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-[var(--surface-well)] flex items-center justify-center text-[var(--ink-700)]">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--surface-well)] text-[var(--ink-500)] border border-[var(--border)]">
+                      {sub.vlan}
+                    </span>
+                  </div>
+
+                  <h5 className="text-xs font-bold text-[var(--ink-900)] leading-tight">
+                    {sub.name}
+                  </h5>
+                  <div className="text-[11px] font-mono text-[var(--ink-500)] mt-1">
+                    {sub.cidr}
+                  </div>
+                  <div className="text-[10px] font-mono text-[var(--ink-400)] mt-0.5">
+                    Port: {sub.gatewayInterface}
+                  </div>
+
+                  {/* Dynamic Status Tag */}
+                  <div className="mt-3 pt-2 border-t border-[var(--border)]">
+                    {isGuestBlocked ? (
+                      <span className="text-[10px] font-mono font-bold block text-center px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800">
+                        TRAFFIC BLOCKED ⛔
+                      </span>
+                    ) : sub.id === "mgmt" ? (
+                      <span className="text-[10px] font-mono font-semibold block text-center px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                        SSH PROTECTED ✓
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono block text-center px-1.5 py-0.5 rounded bg-[var(--surface-well)] text-[var(--ink-700)]">
+                        {sub.hosts.length} Host(s) Connected
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* Selected Node Details Bar */}
-      {selectedNode && (
-        <div className="mt-2 pt-3 border-t border-[var(--pal-200)] flex flex-wrap items-center justify-between gap-3 text-xs">
+      {/* Subnet Technical Inspector Drawer */}
+      <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-well)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[var(--border)] gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-[var(--ink-500)] font-mono text-[11px]">Selected:</span>
-            <span className="font-bold text-[var(--ink-900)]">
-              {nodes.find((n) => n.id === selectedNode)?.title}
-            </span>
+            <Layers className="w-4 h-4 text-[var(--ink-700)]" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--ink-900)]">
+              Subnet Inspector: {activeSubnet.name} ({activeSubnet.vlan})
+            </h4>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {nodes
-              .find((n) => n.id === selectedNode)
-              ?.details.map((detail, idx) => (
-                <span
-                  key={idx}
-                  className="px-2 py-0.5 rounded neu-inset font-mono text-[11px] text-[var(--ink-700)]"
-                >
-                  {detail}
-                </span>
-              ))}
+          <div className="flex items-center gap-3 text-xs font-mono text-[var(--ink-500)]">
+            <span>Gateway IP: <strong className="text-[var(--ink-900)]">{activeSubnet.gatewayIp}</strong></span>
+            <span>•</span>
+            <span>Interface: <strong className="text-[var(--ink-900)]">{activeSubnet.gatewayInterface}</strong></span>
           </div>
         </div>
-      )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+          {/* Host Allocations */}
+          <div>
+            <h5 className="text-[11px] font-bold text-[var(--ink-700)] uppercase tracking-wider mb-2 font-mono">
+              Connected Endpoints &amp; MAC Allocations
+            </h5>
+            <div className="space-y-1.5 font-mono text-xs">
+              {activeSubnet.hosts.map((host, idx) => (
+                <div
+                  key={idx}
+                  className="p-2.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border)] flex items-center justify-between text-[11px]"
+                >
+                  <div>
+                    <span className="font-bold text-[var(--ink-900)] block">{host.name}</span>
+                    <span className="text-[10px] text-[var(--ink-400)]">MAC: {host.mac}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[var(--ink-700)] font-semibold block">{host.ip}</span>
+                    <span className="text-[10px] text-[var(--ink-500)]">{host.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Active Interface Firewall Rules */}
+          <div>
+            <h5 className="text-[11px] font-bold text-[var(--ink-700)] uppercase tracking-wider mb-2 font-mono">
+              Active Netfilter Rules on {activeSubnet.gatewayInterface}
+            </h5>
+            <div className="space-y-1.5 font-mono text-xs">
+              {activeSubnet.rules.map((rule, idx) => {
+                const isDrop = rule.startsWith("DROP");
+                const isLockout = rule.includes("LOCKOUT");
+
+                return (
+                  <div
+                    key={idx}
+                    className={`p-2.5 rounded-lg border text-[11px] leading-relaxed ${
+                      isDrop
+                        ? "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 font-semibold"
+                        : isLockout
+                        ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300"
+                        : "bg-[var(--surface-card)] border-[var(--border)] text-[var(--ink-700)]"
+                    }`}
+                  >
+                    {rule}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

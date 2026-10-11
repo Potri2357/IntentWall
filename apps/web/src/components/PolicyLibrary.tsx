@@ -6,12 +6,10 @@ import {
   Shield,
   RotateCcw,
   Eye,
-  Clock,
   ShieldCheck,
   Search,
-  Filter,
   FlaskConical,
-  CircleX,
+  RefreshCw,
 } from "lucide-react";
 
 interface PolicyLibraryProps {
@@ -29,7 +27,7 @@ export function PolicyLibrary({ onSelectPolicy }: PolicyLibraryProps) {
       const data = await listPolicies();
       setPolicies(data);
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching policies:", err);
     } finally {
       setLoading(false);
     }
@@ -45,7 +43,7 @@ export function PolicyLibrary({ onSelectPolicy }: PolicyLibraryProps) {
       await rollbackPolicy(policyId, "admin-reviewer");
       await fetchPolicies();
     } catch (err) {
-      alert("Rollback failed: " + err);
+      console.error("Rollback failed:", err);
     } finally {
       setRollingBack(null);
     }
@@ -58,38 +56,39 @@ export function PolicyLibrary({ onSelectPolicy }: PolicyLibraryProps) {
   );
 
   return (
-    <div className="neu-raised-md p-6 border border-[var(--pal-200)] space-y-4">
+    <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-4 transition-colors">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-[var(--pal-200)] gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3.5 border-b border-[var(--border)] gap-3">
         <div>
           <h3 className="text-sm font-bold text-[var(--ink-900)] flex items-center gap-2">
-            <Shield className="w-4 h-4 text-[var(--ink-700)]" strokeWidth={1.75} />
-            Policy Library & Version Control
+            <Shield className="w-4 h-4 text-[var(--ink-700)]" strokeWidth={2} />
+            Gateway Policy Library &amp; Version History
           </h3>
           <p className="text-xs text-[var(--ink-500)] mt-0.5">
-            Immutable versioned policies with one-click live rollback capability.
+            Active and archived firewall policies stored in gateway database with live rollback capability.
           </p>
         </div>
 
         {/* Search bar */}
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl neu-inset text-xs w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-[var(--ink-500)]" strokeWidth={1.75} />
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-well)] text-xs w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-[var(--ink-400)]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search policies by name, ID or prompt..."
-              className="bg-transparent text-[var(--ink-900)] placeholder:text-[var(--ink-500)] focus:outline-none w-full"
+              placeholder="Filter by policy name, ID, or prompt..."
+              className="bg-transparent text-[var(--ink-900)] placeholder:text-[var(--ink-400)] focus:outline-none w-full font-mono text-[11px]"
             />
           </div>
 
           <button
             onClick={fetchPolicies}
             aria-label="Refresh policy list"
-            className="neu-raised-sm px-3 py-1.5 rounded-xl text-xs text-[var(--ink-700)] hover:text-[var(--ink-900)] cursor-pointer shrink-0"
+            className="px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-well)] text-xs text-[var(--ink-700)] hover:text-[var(--ink-900)] hover:border-[var(--border-strong)] transition-colors cursor-pointer shrink-0 flex items-center gap-1.5"
           >
-            Refresh
+            <RefreshCw className="w-3 h-3" />
+            <span>Refresh</span>
           </button>
         </div>
       </div>
@@ -97,26 +96,26 @@ export function PolicyLibrary({ onSelectPolicy }: PolicyLibraryProps) {
       {/* Table Container */}
       {loading ? (
         <div className="p-8 text-center text-[var(--ink-500)] text-xs font-mono">
-          Loading policies...
+          Loading policies from gateway database...
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-12 text-center text-[var(--ink-500)] text-xs font-mono">
-          No policies matching search. Compile an intent from the Command Center to add.
+          No policies recorded yet. Compile and approve a policy in the Firewall Console to register.
         </div>
       ) : (
-        <div className="rounded-xl border border-[var(--pal-200)] overflow-hidden">
+        <div className="rounded-xl border border-[var(--border)] overflow-hidden">
           <table className="w-full text-left text-xs font-sans">
-            <thead className="bg-[var(--surface-card)] text-[var(--ink-500)] text-[11px] font-mono border-b border-[var(--pal-200)]">
+            <thead className="bg-[var(--surface-well)] text-[var(--ink-500)] text-[11px] font-mono border-b border-[var(--border)]">
               <tr>
-                <th className="py-2.5 px-4">Policy / Prompt</th>
-                <th className="py-2.5 px-3">State</th>
+                <th className="py-2.5 px-4">Policy / Intent</th>
+                <th className="py-2.5 px-3">Status</th>
                 <th className="py-2.5 px-3">Risk</th>
                 <th className="py-2.5 px-3">Versions</th>
                 <th className="py-2.5 px-3">Updated</th>
                 <th className="py-2.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--pal-200)] bg-[var(--surface-card)]">
+            <tbody className="divide-y divide-[var(--border)] bg-[var(--surface-card)]">
               {filtered.map((pol) => {
                 const isApplied = pol.status === "applied";
                 const isRolledBack = pol.status === "rolled_back";
@@ -126,7 +125,7 @@ export function PolicyLibrary({ onSelectPolicy }: PolicyLibraryProps) {
                   <tr
                     key={pol.id}
                     onClick={() => onSelectPolicy(pol)}
-                    className="hover:bg-[var(--pal-50)] transition-colors cursor-pointer"
+                    className="hover:bg-[var(--surface-well)] transition-colors cursor-pointer"
                   >
                     {/* Name & Prompt */}
                     <td className="py-3 px-4">
@@ -139,14 +138,14 @@ export function PolicyLibrary({ onSelectPolicy }: PolicyLibraryProps) {
                     {/* Status Badge */}
                     <td className="py-3 px-3">
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
                           isApplied
-                            ? "bg-[rgba(26,107,67,0.12)] text-[var(--allow)] border border-[rgba(26,107,67,0.3)]"
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
                             : isRolledBack
-                            ? "bg-[rgba(138,90,0,0.12)] text-[var(--warn)] border border-[rgba(138,90,0,0.3)]"
+                            ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
                             : isSimulated
-                            ? "bg-[rgba(47,93,158,0.12)] text-[var(--info)] border border-[rgba(47,93,158,0.3)]"
-                            : "neu-raised-sm text-[var(--ink-500)]"
+                            ? "bg-[var(--surface-well)] text-[var(--ink-700)] border border-[var(--border)]"
+                            : "bg-[var(--surface-well)] text-[var(--ink-500)] border border-[var(--border)]"
                         }`}
                       >
                         {isApplied ? (
@@ -181,7 +180,7 @@ export function PolicyLibrary({ onSelectPolicy }: PolicyLibraryProps) {
                         <button
                           onClick={() => onSelectPolicy(pol)}
                           aria-label="Inspect policy"
-                          className="neu-raised-sm px-2.5 py-1 rounded-lg text-xs text-[var(--ink-700)] hover:text-[var(--ink-900)] flex items-center gap-1 cursor-pointer"
+                          className="px-2.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface-well)] text-xs text-[var(--ink-700)] hover:text-[var(--ink-900)] flex items-center gap-1 cursor-pointer transition-colors"
                         >
                           <Eye className="w-3 h-3" />
                           <span>Inspect</span>
@@ -192,10 +191,10 @@ export function PolicyLibrary({ onSelectPolicy }: PolicyLibraryProps) {
                             onClick={() => handleRollback(pol.id)}
                             disabled={rollingBack === pol.id}
                             aria-label="Roll back policy"
-                            className="neu-raised-sm px-2.5 py-1 rounded-lg text-xs text-[var(--deny)] hover:bg-[rgba(179,38,30,0.1)] border border-[rgba(179,38,30,0.3)] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            className="px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-xs text-red-700 dark:text-red-400 hover:bg-red-100 flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
                           >
                             <RotateCcw className="w-3 h-3" />
-                            <span>{rollingBack === pol.id ? "Rolling back..." : "Roll Back"}</span>
+                            <span>{rollingBack === pol.id ? "Rolling..." : "Rollback"}</span>
                           </button>
                         )}
                       </div>
