@@ -133,7 +133,7 @@ export function IntentReviewCard({
               {ir.destination.ref} ({ir.destination.type})
             </span>
             <span className="text-[10px] text-[var(--ink-400)] block">
-              {ir.protocols?.map((p) => `${p.proto.toUpperCase()}/${p.port || "ANY"}`).join(", ") || "All Protocols"}
+              {ir.protocols?.map((p) => `${(p.proto || "TCP").toUpperCase()}/${p.port || "ANY"}`).join(", ") || "All Protocols"}
             </span>
           </div>
         </div>

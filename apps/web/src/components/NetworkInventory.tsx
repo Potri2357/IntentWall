@@ -101,22 +101,30 @@ export function NetworkInventory() {
               key={key}
               className="bg-[var(--surface-card)] p-4 rounded-xl border border-[var(--border)] space-y-2 shadow-xs hover:border-[var(--border-strong)] hover:bg-[var(--surface-well)] transition-all"
             >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-xs text-[var(--ink-900)] uppercase font-mono">{key}</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--surface-well)] border border-[var(--border)] text-[var(--ink-700)]">
-                  {svc.description}
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-xs text-[var(--ink-900)] uppercase font-mono">{svc.name || key}</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--surface-well)] border border-[var(--border)] text-[var(--ink-700)] truncate max-w-[160px]" title={svc.description}>
+                  {svc.category || svc.description}
                 </span>
               </div>
 
               <div className="pt-1 flex flex-wrap gap-1 font-mono text-[11px]">
-                {svc.ports?.map((p: any, idx: number) => (
-                  <span
-                    key={idx}
-                    className="px-2 py-0.5 rounded bg-[var(--surface-well)] border border-[var(--border)] text-[var(--ink-700)] font-medium"
-                  >
-                    {p.proto.toUpperCase()}/{p.port}
-                  </span>
-                ))}
+                {svc.ports?.map((p: any, idx: number) => {
+                  const portStr = typeof p === "object" && p !== null ? p.port : p;
+                  const protoStr = typeof p === "object" && p !== null && p?.proto
+                    ? String(p.proto).toUpperCase()
+                    : Array.isArray(svc.protocols)
+                    ? svc.protocols.map((pr: any) => String(pr).toUpperCase()).join("/")
+                    : "TCP";
+                  return (
+                    <span
+                      key={idx}
+                      className="px-2 py-0.5 rounded bg-[var(--surface-well)] border border-[var(--border)] text-[var(--ink-700)] font-medium"
+                    >
+                      {protoStr}/{portStr}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           ))}
